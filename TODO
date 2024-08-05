@@ -1,0 +1,10 @@
+* Put the plots on the same axis (raw)
+* Plot normalized traces
+* Find a better way to convert to long format that does not depend on region label
+* Add a different baseline correction option for when isobestic point of the sensor is different from neurophotometric wavelength
+* Biexponential decay (`biexponential decay`) fit in detrending function (demodulate) needs to work better, such that it works about as well as airPLS
+* How to install `kaleido`
+* Figure out why my iPython notebooks render white blocks instead of some text when using VStudio
+
+
+* Rebuild batch processing for Rudi's workflow
