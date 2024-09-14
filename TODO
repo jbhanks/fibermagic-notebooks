@@ -8,3 +8,21 @@
 
 
 * Rebuild batch processing for Rudi's workflow
+
+
+from scipy.optimize import curve_fit
+
+########
+* Why is `p0_hypotheses` of `demodulate_with_biexponential_decay` hard-coded? On what basis are the initial values selected? Is there any reason not to randomly generate them each time? (setting a seed of course)
+
+* airPLS and biexponential decay are methods of detrending, which corresponds to the "bleaching correction" step, right?
+
+* What is the theoretical (or practical) reason for choosing preferring biexponential decay to airPLS and?
+
+* If one "works" and the other doesn't, does that indicate an issue with the parameters, the data, or just that some data works better with one than the other?
+
+* Is it kosher to use different parameter values for the two methods?
+
+* Is the expectation that both methods give similar results? How important is that?
+
+* Are `lambda`, `porder`, `itermax` the main parameters for artifact removal? Which of these are you comfortable playing with in order to get biexponential decay to work?
