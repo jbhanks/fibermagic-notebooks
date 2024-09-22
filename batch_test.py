@@ -153,7 +153,7 @@ for protocol in recs.keys():
         rec['photometry'] = count_frames(rec['photometry'])
         rec['photometry'] = convert_to_long(rec['photometry'])
         rec['demodulated_airPLS'] = run_detrend(rec['photometry'], "airPLS")
-        rec['demodulated_biexp'] = run_detrend(rec['photometry'], "biexponential decay")
+        # rec['demodulated_biexp'] = run_detrend(rec['photometry'], "biexponential decay")
 
 
 

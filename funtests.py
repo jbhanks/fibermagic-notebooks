@@ -19,7 +19,6 @@ def read_project_logs(project_path, subdirs, sync_fun=sync_from_TTL_gen, ignore_
     ...       ...
     """
     dfs = list()
-
     def recursive_listdir(path, levels):
         import os
         if levels:
@@ -105,6 +104,7 @@ levels = len(subdirs)
 
 
 region_to_mouse = pd.read_csv(basepath + schedule + '/' + 'region_to_mouse.csv')
+
 for mouse in region_to_mouse.mouse.unique():
     for file in os.listdir(fullpath):
         if '.log' in file:
