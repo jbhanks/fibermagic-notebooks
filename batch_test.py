@@ -17,7 +17,7 @@ basepath = '/home/jam/Downloads/NAcC gDA3m + rAdo1.3 FR20-PR/DATA/'
 # class Recording:
 #     """class for information about each recording"""
 #     mouse: str
-#     protocol: str
+#     schedule: str
 #     date: datetime.datetime | None
 #     basepath: pathlib.Path | None
 #     log: pd.DataFrame | None
@@ -55,7 +55,7 @@ def get_one(mouse, logs):
     new_recording = dict(
         path = None,
         mouse = mouse,
-        protocol = None,
+        schedule = None,
         date = parse(logs.datetimestamp.iloc[0]),
         logs = mouse_log,
         photometry = None)
@@ -63,25 +63,25 @@ def get_one(mouse, logs):
 
 
 def organize_logs(basepath, newest_only=True):
-    protocols = [dir for dir in
+    schedules = [dir for dir in
                  os.listdir(basepath) if not dir.startswith('.')]
     recordings = {}
-    for protocol in protocols:
-        recordings[protocol] = []
+    for schedule in schedules:
+        recordings[schedule] = []
         # get paths while excluding dotfiles
-        for f in pathlib.Path(basepath + protocol).glob('**/[!.]*/'):
+        for f in pathlib.Path(basepath + schedule).glob('**/[!.]*/'):
             logfile = f / 'logs.csv'
             logs = read_experiment(logfile)
             mice_by_exp = str(logfile.parents[0]).split('/')[-1].split(',')
             for mouse in mice_by_exp:
                 new_recording = get_one(mouse, logs)
-                new_recording['path'] = f
-                new_recording['protocol'] = protocol
-                recordings[protocol].append(new_recording)
-            recordings[protocol] = [rec for rec in
-                                    recordings[protocol] if rec is not None]
+                # new_recording['path'] = f
+                # new_recording['schedule'] = schedule
+                recordings[schedule].append(new_recording)
+            recordings[schedule] = [rec for rec in
+                                    recordings[schedule] if rec is not None]
         if newest_only == True:
-            recordings[protocol] = keep_newest_only(recordings[protocol])
+            recordings[schedule] = keep_newest_only(recordings[schedule])
         else:
             pass
     return recordings
@@ -139,57 +139,79 @@ import copy
 from rudi_demodulate import demodulate as detrend
 
 def run_detrend(df, method):
-    df2 = copy.deepcopy(df)
+    # df2 = copy.deepcopy(df)
     # from fibermagic import demodulate as detrend
-    df2["zdFF"] = detrend(df2 , "Timestamp", "Signal", "Reference", "Channel", steps=False, method=method, smooth=10, standardize=True)
-    return df2
+    df["zdFF"] = detrend(df , "Timestamp", "Signal", "Reference", "Channel", steps=False, method=method, smooth=10, standardize=True)
+    df.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
+    return df
 
 
 recs = organize_logs(basepath)
 
-for protocol in recs.keys():
-    for rec in recs[protocol]:
+for schedule in recs.keys():
+    for rec in recs[schedule]:
         rec = get_photometry(rec)
         rec['photometry'] = count_frames(rec['photometry'])
         rec['photometry'] = convert_to_long(rec['photometry'])
-        rec['demodulated_airPLS'] = run_detrend(rec['photometry'], "airPLS")
-        # rec['demodulated_biexp'] = run_detrend(rec['photometry'], "biexponential decay")
+        rec['detrended'] = run_detrend(rec['photometry'], "airPLS")
+        # rec['detrended'] = run_detrend(rec['photometry'], "biexponential decay")
+
+
+# def synchronize_files(recording):
+#     logs = recording['logs']
+#     photometry = recording['photometry']
+#     mouse = recording['mouse']
+#     df = recording ['detrended']
+#     logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
+#     dfsx = copy.deepcopy(df)
+#     dfsx = dfsx.reset_index()
+#     logsG = pd.merge_asof(logs, dfsx[dfsx.Channel == 470], on="Timestamp", direction = "nearest")
+#     logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
+#     logsR = pd.merge_asof(logs, dfsx[dfsx.Channel == 560], on="Timestamp", direction = "nearest")
+#     logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
+#     slogs = pd.concat([logsR, logsG], axis=0)
+#     slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
+#     dfsx = dfsx.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
+#     return dfsx
 
 
 
+for schedule in recs.keys():
+    for idx,rec in enumerate(recs[schedule]):
+        recs[schedule][idx]['synced'] = synchronize_files(rec)
 
-logs = recs['PR2'][0]['logs']
-photometry = recs['PR2'][0]['photometry']
-mouse = recs['PR2'][0]['mouse']
-df = recs['PR2'][0]['demodulated']
+# logs = recs['PR2'][0]['logs']
+# photometry = recs['PR2'][0]['photometry']
+# mouse = recs['PR2'][0]['mouse']
+# df = recs['PR2'][0]['detrended']
 
-logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
-
-
-dfsx = copy.deepcopy(df)
-dfsx = dfsx.reset_index()
-
-logsG = pd.merge_asof(logs, dfsx[dfsx.Channel == 470], on="Timestamp", direction = "nearest")
-logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-
-
-
-
-logsR = pd.merge_asof(logs, dfsx[dfsx.Channel == 560], on="Timestamp", direction = "nearest")
-logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-
-slogs = pd.concat([logsR, logsG], axis=0)
-slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
-
-
-dfsx = dfsx.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
-dfsx
+# logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
+#
+#
+# dfsx = copy.deepcopy(df)
+# dfsx = dfsx.reset_index()
+#
+# logsG = pd.merge_asof(logs, dfsx[dfsx.Channel == 470], on="Timestamp", direction = "nearest")
+# logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
+#
+#
+#
+#
+# logsR = pd.merge_asof(logs, dfsx[dfsx.Channel == 560], on="Timestamp", direction = "nearest")
+# logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
+#
+# slogs = pd.concat([logsR, logsG], axis=0)
+# slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
+#
+#
+# dfsx = dfsx.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
+# dfsx
 
 
 #####
 from fibermagic.core.perievents import perievents
 
-peri = perievents(dfsx, slogs[slogs.Event=='FD'], window=20, frequency=10)
+peri = perievents(rec['detrended'], rec['synced'].Event=='FD', window=20, frequency=10)
 peri
 
 from pathlib import Path
