@@ -43,7 +43,7 @@ def perievents(df, logs, window, frequency):
         logs = logs.swaplevel(-1, -2)
     logs = logs.loc[df.index.intersection(logs.index)]  # remove events that are not recorded
 
-    df = df.sort_index()  # to slice it in frame ranges
+    df = df.sort_index()
     logs['Trial'] = logs.groupby(logs.index.names[:-1]).cumcount()
     peri = list()
     timestamps = np.arange(-window, window + 1e-9, 1 / frequency)

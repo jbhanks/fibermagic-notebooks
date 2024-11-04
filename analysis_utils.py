@@ -119,10 +119,10 @@ def convert_to_long(df):
     return df
 
 def synchronize_files(recording):
-    logs = recording['logs']
+    behavior = recording['logs']
     photometry = recording['photometry']
     mouse = recording['mouse']
-    df = recording ['detrended']
+    df = recording['detrended']
     logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
     df = df.reset_index()
     logsG = pd.merge_asof(logs, df[df.Channel == 470], on="Timestamp", direction = "nearest")
@@ -131,4 +131,5 @@ def synchronize_files(recording):
     logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
     slogs = pd.concat([logsR, logsG], axis=0)
     slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
-    return slogs
+    df = df.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
+    return df,slogs

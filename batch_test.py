@@ -3,136 +3,15 @@ import numpy as np
 from fibermagic.IO.NeurophotometricsIO import extract_leds
 import os
 import pathlib
+from analysis_utils import *
 
 # If not already installed, uncomment and and run:
 # pip install git+https://github.com/faustrp/fibermagic.git
 
 basepath = '/home/jam/Downloads/NAcC gDA3m + rAdo1.3 FR20-PR/DATA/'
-# logs = getLogs(basepath=basepath)
-
-
-# from dataclasses import dataclass
-
-# @dataclass
-# class Recording:
-#     """class for information about each recording"""
-#     mouse: str
-#     schedule: str
-#     date: datetime.datetime | None
-#     basepath: pathlib.Path | None
-#     log: pd.DataFrame | None
-#     photometry: pd.DataFrame | None
 
 
 
-
-def keep_newest_only(df_dict):
-    from collections import defaultdict
-    new = []
-    df_dict = sorted(df_dict, key=lambda d: d['mouse'])
-    grouped_data = defaultdict(list)
-    for item in df_dict:
-        grouped_data[item['mouse']].append(item)
-    # Select the item with the maximum 'date' from each group
-    new.append([max(group, key=lambda x: x['date']) for group in grouped_data.values()])
-    return new[0]
-
-
-def read_experiment(logfile):
-    abspath = logfile.absolute()
-    logs = pd.read_csv(abspath)
-    logs.columns = ['ComputerTimestamp', 'SystemTimestamp', 'animal.ID', 'Event', 'pi.time', 'pc.time', 'datetimestamp']
-    return logs
-
-def get_one(mouse, logs):
-    from dateutil.parser import parse
-    mouse_log = logs[logs['animal.ID']==mouse]
-    # Drop any empty dataframes
-    if len(mouse_log)==0:
-        return None
-    # Make a dictionary for each animal for each experimental run including info about it and the data itself
-    print("the dimensions of the log for ", mouse, " are ", mouse_log.shape )
-    new_recording = dict(
-        path = None,
-        mouse = mouse,
-        schedule = None,
-        date = parse(logs.datetimestamp.iloc[0]),
-        logs = mouse_log,
-        photometry = None)
-    return new_recording
-
-
-def organize_logs(basepath, newest_only=True):
-    schedules = [dir for dir in
-                 os.listdir(basepath) if not dir.startswith('.')]
-    recordings = {}
-    for schedule in schedules:
-        recordings[schedule] = []
-        # get paths while excluding dotfiles
-        for f in pathlib.Path(basepath + schedule).glob('**/[!.]*/'):
-            logfile = f / 'logs.csv'
-            logs = read_experiment(logfile)
-            mice_by_exp = str(logfile.parents[0]).split('/')[-1].split(',')
-            for mouse in mice_by_exp:
-                new_recording = get_one(mouse, logs)
-                # new_recording['path'] = f
-                # new_recording['schedule'] = schedule
-                recordings[schedule].append(new_recording)
-            recordings[schedule] = [rec for rec in
-                                    recordings[schedule] if rec is not None]
-        if newest_only == True:
-            recordings[schedule] = keep_newest_only(recordings[schedule])
-        else:
-            pass
-    return recordings
-
-
-def get_photometry(recording):
-    from fibermagic.IO.NeurophotometricsIO import extract_leds
-    filepath = pathlib.Path(recording['path'] / 'photometry.csv')
-    df = pd.read_csv(filepath)
-    df = df.rename(columns={'R0':'Region0R','G1':'Region1G'})
-    df = df.rename(columns={'Timestamp':'SystemTimestamp'})
-    df = df[df.SystemTimestamp>=recording['logs'].iloc[0]['SystemTimestamp']]
-    if 'Flags' in df.columns:  # legacy fix: Flags were renamed to LedState
-        df = df.rename(columns={'Flags': 'LedState'})
-    df = extract_leds(df).dropna()
-    print("the final dimensions of the photometry for ", recording['mouse'], " are ", df.shape )
-    recording['photometry'] = df
-    return recording
-
-
-
-def count_frames(df):
-    # dirty hack to come around dropped frames until we find better solution -
-    # it makes about 0.16 s difference
-    #df = df.iloc[0:]
-    df.FrameCounter = np.arange(0, len(df)) // len(df.wave_len.unique())
-    df = df.set_index('FrameCounter')
-    df.head(5)
-    return df
-
-
-# Convert to long format
-def convert_to_long(df):
-    NPM_RED = 560
-    NPM_GREEN = 470
-    NPM_ISO = 410
-    regions = [column for column in df.columns if 'Region' in column]
-    dfs = list()
-    for region in regions:
-        channel = NPM_GREEN if 'G' in region else NPM_RED
-        sdf = pd.DataFrame(data={
-            'Region': region,
-            'Channel': channel,
-            'Timestamp': df.SystemTimestamp[df.wave_len == channel],
-            'Signal': df[region][df.wave_len == channel],
-            'Reference': df[region][df.wave_len == NPM_ISO]
-        }
-        )
-        dfs.append(sdf)
-    df = pd.concat(dfs).reset_index().set_index('Region').dropna()
-    return df
 
 from rudi_demodulate import *
 import copy
@@ -157,73 +36,95 @@ for schedule in recs.keys():
         # rec['detrended'] = run_detrend(rec['photometry'], "biexponential decay")
 
 
-# def synchronize_files(recording):
-#     logs = recording['logs']
-#     photometry = recording['photometry']
-#     mouse = recording['mouse']
-#     df = recording ['detrended']
-#     logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
-#     dfsx = copy.deepcopy(df)
-#     dfsx = dfsx.reset_index()
-#     logsG = pd.merge_asof(logs, dfsx[dfsx.Channel == 470], on="Timestamp", direction = "nearest")
-#     logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-#     logsR = pd.merge_asof(logs, dfsx[dfsx.Channel == 560], on="Timestamp", direction = "nearest")
-#     logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-#     slogs = pd.concat([logsR, logsG], axis=0)
-#     slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
-#     dfsx = dfsx.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
-#     return dfsx
-
-
+all_logs = []
+all_synced = []
 
 for schedule in recs.keys():
     for idx,rec in enumerate(recs[schedule]):
-        recs[schedule][idx]['synced'] = synchronize_files(rec)
+        nu_df, synced = synchronize_files(rec)
+        nu_df['schedule'] = schedule
+        synced['schedule'] = schedule
+        all_logs.append(nu_df)
+        all_synced.append(synced)
+        # recs[schedule][idx]['nu_logs'] = nu_df
+        # recs[schedule][idx]['synced'] = synced
 
-# logs = recs['PR2'][0]['logs']
-# photometry = recs['PR2'][0]['photometry']
-# mouse = recs['PR2'][0]['mouse']
-# df = recs['PR2'][0]['detrended']
 
-# logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
-#
-#
-# dfsx = copy.deepcopy(df)
-# dfsx = dfsx.reset_index()
-#
-# logsG = pd.merge_asof(logs, dfsx[dfsx.Channel == 470], on="Timestamp", direction = "nearest")
-# logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-#
-#
-#
-#
-# logsR = pd.merge_asof(logs, dfsx[dfsx.Channel == 560], on="Timestamp", direction = "nearest")
-# logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-#
-# slogs = pd.concat([logsR, logsG], axis=0)
-# slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
-#
-#
-# dfsx = dfsx.reset_index().set_index(['Region', 'Channel', 'FrameCounter'])
-# dfsx
+catlogs = pd.concat(all_logs)
+catsync = pd.concat(all_synced)
+
 
 
 #####
 from fibermagic.core.perievents import perievents
 
-peri = perievents(rec['detrended'], rec['synced'].Event=='FD', window=20, frequency=10)
-peri
+# peri = perievents(rec['detrended'], rec['synced'].Event=='FD', window=20, frequency=10)
+# peri
+#
+# from pathlib import Path
+# output_path = Path('Perievents rAdo1.3+GCaMP8m/biexponential decay/PR5')
+# schedule = 'PR5'
+# peri.to_csv(mouse + schedule + '-20s.csv')
 
-from pathlib import Path
-output_path = Path('Perievents rAdo1.3+GCaMP8m/biexponential decay/PR5')
-schedule = 'PR5'
-peri.to_csv(mouse + schedule + '-20s.csv')
+# figR = px.scatter(peri.loc['Region0R'].reset_index(), x='Timestamp', y='Trial', color='zdFF', range_color=(-5,5),
+#                  color_continuous_scale=['blue', 'grey', 'red'], height=300).update_yaxes(autorange="reversed", title_text='Reward #', title_font={'size': 20}, tickfont={'size': 18}).update_xaxes(title_text=None, showticklabels=False).update_layout(title={'text':"Adenosine", 'x':0.5})
+# for scatter in figR.data:
+#     scatter.marker.symbol = 'square'
+# figR.show()
 
-figR = px.scatter(peri.loc['Region0R'].reset_index(), x='Timestamp', y='Trial', color='zdFF', range_color=(-5,5),
-                 color_continuous_scale=['blue', 'grey', 'red'], height=300).update_yaxes(autorange="reversed", title_text='Reward #', title_font={'size': 20}, tickfont={'size': 18}).update_xaxes(title_text=None, showticklabels=False).update_layout(title={'text':"Adenosine", 'x':0.5})
-for scatter in figR.data:
-    scatter.marker.symbol = 'square'
-figR.show()
+
+
+df = catsync
+logs = catlogs
+logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
+window=5
+frequency=10
+
+# def perievents(df, logs, window, frequency):
+    """
+    produces perievent slices for each event in logs
+    :param df: df with 'Channel' as index and value columns
+    :param logs: logs df with columns event and same index as df
+    :param window: number of SECONDS to cut left and right off
+    :param frequency: int, frequency of recording in Hz
+    :return: perievent dataframe with additional indices event, timestamp and Trial
+    """
+channels = df.index.unique(level='Channel')
+
+if 'Channel' not in logs.index.names:  # make indices the same to intersect
+    logs['Channel'] = [list(channels)] * len(logs)
+    logs = logs.explode('Channel').set_index('Channel', append=True)
+    logs = logs.swaplevel(-1, -2)
+
+logs = logs.loc[df.index.intersection(logs.index)]  # remove events that are not recorded
+
+df = df.sort_index()  # to slice it in frame ranges
+logs['Trial'] = logs.groupby(logs.index.names[:-1]).cumcount()
+peri = []
+timestamps = np.arange(-window, window + 1e-9, 1 / frequency)
+
+failed = []
+
+# extract slice for each event and concat
+for index, row in logs.iterrows():
+    start = index[:-1] + (index[-1] - window * frequency,)
+    end = index[:-1] + (1 + index[-1] + window * frequency,)
+    print(start, end)
+    single_event = df.iloc[start[2]:end[2]]
+    print("single event shape", single_event.shape)
+    if single_event.shape[0] != 101:
+        failed.append(single_event)
+        continue
+    #single_event[row.index] = row
+    single_event['Timestamp'] = timestamps
+    print(single_event)
+    peri.append(single_event)  # Set on copy warning can be ignored because it is a copy anyways
+
+peri = pd.concat(peri)
+
+peri = peri.set_index(list(logs.columns), append=True)
+peri = peri.reset_index(['FrameCounter'], drop=True)
+    # return peri
 
 
 
@@ -254,8 +155,48 @@ figR.show()
 # df = recs['PR2'][0]['photometry']
 
 
+df = catsync
+logs = catlogs
+logs = logs.rename(columns={'SystemTimestamp':'Timestamp'})
+window=5
+frequency=10
 
+# def perievents2(detrended, behavior, window, frequency):
+    """
+    produces perievent slices for each event in behavior
+    :param detrended: df with 'Channel' as index and value columns
+    :param behavior: behavior df with columns event and same index as df
+    :param window: number of SECONDS to cut left and right off
+    :param frequency: int, frequency of recording in Hz
+    :return: perievent dataframe with additional indices event, timestamp and Trial
+    """
+channels = detrended.index.unique(level='Channel')
 
+if 'Channel' not in behavior.index.names:  # make indices the same to intersect
+    behavior['Channel'] = [list(channels)] * len(behavior)
+    behavior = behavior.explode('Channel').set_index('Channel', append=True)
+    behavior = behavior.swaplevel(-1, -2)
+behavior = behavior.loc[detrended.index.intersection(behavior.index)]  # remove events that are not recorded
+
+detrended = detrended.sort_index()
+behavior['Trial'] = behavior.groupby(behavior.index.names[:-1]).cumcount()
+peri = list()
+timestamps = np.arange(-window, window + 1e-9, 1 / frequency)
+
+# extract slice for each event and concat
+for index, row in behavior.iterrows():
+    start = index[:-1] + (index[-1] - window * frequency,)
+    end = index[:-1] + (index[-1] + window * frequency,)
+
+    single_event = detrended.loc[start:end]
+    single_event[row.index] = row
+    single_event['Timestamp'] = timestamps
+    peri.append(single_event)  # Set on copy warning can be ignored because it is a copy anyways
+peri = pd.concat(peri)
+
+peri = peri.set_index(list(behavior.columns), append=True)
+peri = peri.reset_index(['FrameCounter'], drop=True)
+    # return peri
 
 
 
