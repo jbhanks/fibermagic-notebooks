@@ -26,3 +26,10 @@ from scipy.optimize import curve_fit
 * Is the expectation that both methods give similar results? How important is that?
 
 * Are `lambda`, `porder`, `itermax` the main parameters for artifact removal? Which of these are you comfortable playing with in order to get biexponential decay to work?
+
+
+### Synchronization
+
+1. Merge timestamps red channel with event timestamps
+2. Match timestamps for green channel with event timestamps
+3. Concatenate end to end

@@ -129,7 +129,7 @@ def synchronize_files(recording):
     logsG = logsG[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
     logsR = pd.merge_asof(logs, df[df.Channel == 560], on="Timestamp", direction = "nearest")
     logsR = logsR[['Region', 'Channel', 'FrameCounter', 'Event', 'Timestamp', 'animal.ID']]
-    slogs = pd.concat([logsR, logsG], axis=0)
-    slogs = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
+    photometry_synced = pd.concat([logsR, logsG], axis=0)
+    photometry_synced = slogs.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
     df = df.reset_index(drop=True).set_index(['Region', 'Channel', 'FrameCounter'])
-    return df,slogs
+    return df,photometry_synced
