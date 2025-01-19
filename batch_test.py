@@ -8,7 +8,7 @@ from analysis_utils import *
 # If not already installed, uncomment and and run:
 # pip install git+https://github.com/faustrp/fibermagic.git
 
-basepath = '/home/jam/Downloads/NAcC gDA3m + rAdo1.3 FR20-PR/DATA/'
+basepath = '/home/james/Massive/PROJECTDATA/NAcC gDA3m + rAdo1.3 FR20-PR/DATA/'
 
 
 
@@ -26,6 +26,31 @@ def run_detrend(df, method):
 
 
 recs = organize_logs(basepath)
+
+# def organize_logs(basepath, newest_only=True):
+protocols = [dir for dir in
+                os.listdir(basepath) if not dir.startswith('.')]
+recordings = {}
+for protocol in protocols:
+    recordings[protocol] = []
+    # get paths while excluding dotfiles
+    for f in pathlib.Path(basepath + protocol).glob('**/[!.]*/'):
+        logfile = f / 'logs.csv'
+        logs = read_experiment(logfile)
+        mice_by_exp = str(logfile.parents[0]).split('/')[-1].split(',')
+        for mouse in mice_by_exp:
+            new_recording = get_one(mouse, logs)
+            new_recording['path'] = f
+            new_recording['protocol'] = protocol
+            recordings[protocol].append(new_recording)
+        recordings[protocol] = [rec for rec in
+                                recordings[protocol] if rec is not None]
+    if newest_only == True:
+        recordings[protocol] = keep_newest_only(recordings[protocol])
+    else:
+        pass
+    # return recordings
+
 
 for schedule in recs.keys():
     for rec in recs[schedule]:

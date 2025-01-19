@@ -47,16 +47,61 @@ def perievents(df, logs, window, frequency):
     logs['Trial'] = logs.groupby(logs.index.names[:-1]).cumcount()
     peri = list()
     timestamps = np.arange(-window, window + 1e-9, 1 / frequency)
-
+    print(f'Len of timestamps at first is {len(timestamps)}')
     # extract slice for each event and concat
     for index, row in logs.iterrows():
+        print("***")
+        print(f"The index is {index}")
+        print(f"The row is {dict(row)}")
         start = index[:-1] + (index[-1] - window * frequency,)
         end = index[:-1] + (index[-1] + window * frequency,)
-
+        print(start, end)
+        print(end[2] - start[2])
+        # print(f'df.loc[start:end] is {df.loc[start:end]}')
+        print(f'df.loc[start] is {df.loc[start]}')
+        # print(f'df.loc[end] is {df.loc[end]}')
+        print(f'Shape of df is {df.shape}')
+        print(len(df.index))
+        print(f"Last df index is {df.index[-1]}")
+        print(df)
+        df.to_csv("df.csv")
         single_event = df.loc[start:end]
+        print(f"Single_event shape is {single_event.shape}")
+        print(f'Len after loc is {len(single_event)}')
+        print(len(single_event.index))
+        print(single_event.index)
         single_event[row.index] = row
+        print(f'Len after index is {len(single_event)}')
+        print(f'Len of timestamps is {len(timestamps)}')
+        print(f'Len of single_event is {len(single_event)}')
         single_event['Timestamp'] = timestamps
         peri.append(single_event)  # Set on copy warning can be ignored because it is a copy anyways
+    # # extract slice for each event and concat
+    # for index, row in logs.iterrows():
+    #     start = index[:-1] + (index[-1] - window * frequency,)
+    #     end = index[:-1] + (index[-1] + window * frequency,)
+    # 
+    #     single_event = df.loc[start:end]
+    #     print(f'Len of timestamps is {len(timestamps)}')
+    #     print(f'Len of single_event is {len(single_event)}')
+    #     try:
+    #         single_event[row.index] = row
+    #     except Exception as e:
+    #         print(f"The error is {e}")
+    #         print(f"The row is {row}")
+    #         print(f"Start is {start}")
+    #         print(f"End is {end}")
+    #         print(single_event)
+    #     try:
+    #         single_event['Timestamp'] = timestamps
+    #     except Exception as e:
+    #         print(f"The error is {e}")
+    #         print(f"The row is {row}")
+    #         print(f"Start is {start}")
+    #         print(f"End is {end}")
+    #         print(single_event)
+    #         raise Exception(e)
+    #     peri.append(single_event)  # Set on copy warning can be ignored because it is a copy anyways
     peri = pd.concat(peri)
 
     peri = peri.set_index(list(logs.columns), append=True)
