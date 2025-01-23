@@ -1,0 +1,13 @@
+name: cfiber
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - ipykernel
+  - python=3.12
+  - sqlite
+  - pandas
+  - ipywidgets
+  - nbformat
+  - conda-forge::python-kaleido
+prefix: /home/james/miniconda3/envs/cfiber
